@@ -98,13 +98,45 @@ var getAccessToken = function (req, res, next) {
     });
 };
 
-app.post("/resource", cors(), getAccessToken, function(req, res){
-    // If the token was found, this will contain the token object from the database. If the token was not found, this will contain null. We can branch our code accordingly.
+var requireAccessToken = function(req, res) {
+
+    // If the token was found, this will contain the token object from the database.
+    // If the token was not found, this will contain null. We can branch our code
+    // accordingly.
     if(req.access_token) {
         res.json(resource);
     } else {
         res.status(401).end();
     }
+}
+
+app.get("/resource", cors(), getAccessToken, requireAccessToken);
+
+var savedWords = [];
+
+app.get('/words', requireAccessToken, function(req, res){
+    /**
+     * Make this function require the "read" scope
+     */
+    res.json({words: savedWords.join(' '), timeStamp: Date.now()});
+});
+
+app.post("/words", requireAccessToken, function (req, res) {
+    /**
+     * Make this function require the "write" scope
+     */
+    if(req.body.word) {
+        savedWords.push(req.body.word);
+    }
+    res.status(201).end();
+});
+
+app.delete('/words', getAccessToken, requireAccessToken, function() {
+    /**
+     * Make this function require the "delete" scope
+     */
+    savedWords.pop();
+    res.status(204).end();
 });
 
 var server = app.listen(9002, 'localhost', function(){
