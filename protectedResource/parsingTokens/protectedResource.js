@@ -1,8 +1,9 @@
 
-var express = required("express");
+var express = require("express");
 var bodyParser = require("body-parser");
 var cons = require('consolidate');
 var cors = require('cors');
+var nosql = require('nosql').load('database.nosql');
 
 var app = express();
 
@@ -18,11 +19,17 @@ app.set('json spaces', 4);
 app.use('/', express.static('files/protectedResource'));
 app.use(cors());
 
+
+app.options('/resource', cors());
+
 var resource = {
       "name": "Protected Resource"
     , "description": "This data has been protected by OAuth 2.0"
-}
+};
 
+
+
+/** ch-4-ex-1 */
 // The third parameter, next, is a function that lets us chain together multiple
 // functions to serve a single request, allowing us to add this token scanning
 // functionality into other handlers throughout our application.
@@ -61,7 +68,53 @@ var getAccessToken = function (req, res, next) {
     else if (req.query && req.query.access_token) {
         inToken = req.query.access_token;
     }
-}
+
+    // The first function passed in checks the value of the stored access tokens
+    // against the input token that we pulled off the wire.
+    nosql.one(function(token) {
+        // If it finds a match, it returns the token and the searching algorithm
+        // stops.
+        if (token.access_token == inToken) {
+            return token;
+        }
+        // The second function is called when either a match is found or the database
+        // is exhausted, whichever comes first. If we do find a token in the store, it
+        // will be passed in the 'token' argument.
+    }, function(err, token) {
+        // If we are unable to find a token with the input value, this argument will
+        // be null.
+        if (token) {
+            console.log("We found a matching token: %s", inToken);
+        } else {
+            console.log('No matching token was found.');
+        }
+        // Whatever we find, we attach it to the access_token member of the req
+        // object and call the next function.
+        req.access_token = token;
+        // The 'req' object is automatically passed to the next part of the process
+        // handler.
+        next();
+        return;
+    });
+};
+
+app.post("/resource", cors(), getAccessToken, function(req, res){
+    // If the token was found, this will contain the token object from the database. If the token was not found, this will contain null. We can branch our code accordingly.
+    if(req.access_token) {
+        res.json(resource);
+    } else {
+        res.status(401).end();
+    }
+});
+
+var server = app.listen(9002, 'localhost', function(){
+    var host = server.address().address;
+    var port = server.address().port;
+
+    console.log('OAuth Resource Server is listening at http://%s:%s', host, port);
+});
+
+
 
 
 
