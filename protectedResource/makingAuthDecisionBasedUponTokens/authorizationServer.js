@@ -31,7 +31,7 @@ var clients = [
 		"client_id": "oauth-client-1",
 		"client_secret": "oauth-client-secret-1",
 		"redirect_uris": ["http://localhost:9000/callback"],
-		"scope": ""
+		"scope": "read write delete"
 	}
 ];
 
@@ -81,7 +81,10 @@ app.get('/', function(req, res) {
 });
 
 app.get("/authorize", function(req, res){
-	
+
+    console.log("Entering /authorize endpoint from client's " +
+		"/authorize endpoint. We were redirected here " +
+		"using front channel communications.");
 	var client = getClient(req.query.client_id);
 	
 	if (!client) {
@@ -93,7 +96,14 @@ app.get("/authorize", function(req, res){
 		res.render('error', {error: 'Invalid redirect URI'});
 		return;
 	} else {
-		
+
+        console.log("Successfully processed clientId and " +
+			"assured the redirect URL exists. Now " +
+			"checking the scope the client requested in the " +
+			"original 'http://localhost:9001/authorize' redirect " +
+			"this populated in the request query parameters" +
+			"'rscope = req.query.scope' and the scopes " +
+			"we permit for this client 'client.scope'");
 		var rscope = req.query.scope ? req.query.scope.split(' ') : undefined;
 		var cscope = client.scope ? client.scope.split(' ') : undefined;
 		if (__.difference(rscope, cscope).length > 0) {
@@ -109,7 +119,12 @@ app.get("/authorize", function(req, res){
 		var reqid = randomstring.generate(8);
 		
 		requests[reqid] = req.query;
-		
+
+		console.log("Calling authorizationServers's " +
+			"approve.html, sending it a client: %s\n" +
+			"this was stringified 'JSON.stringify(client)'" +
+			",a reqid: %s, and a the requested scope: " +
+			"[%s]\n\n", JSON.stringify(client), reqid, rscope);
 		res.render('approve', {client: client, reqid: reqid, scope: rscope});
 		return;
 	}
@@ -118,10 +133,20 @@ app.get("/authorize", function(req, res){
 
 app.post('/approve', function(req, res) {
 
+	console.log("Entered in /approve POST api called from " +
+		"authorizationServers approve.html: it was a form," +
+		"action=\"/approve\",method=\"POST\" with an " +
+		"input type of checkbox and input type of submit.");
 	var reqid = req.body.reqid;
 	var query = requests[reqid];
 	delete requests[reqid];
 
+	console.log("Checking the request list for this " +
+		"reqid. Then we will check the response_type " +
+		"to see if it's equal to code. If it is it " +
+		"constructs the allowed scopes for the " +
+		"client. The client will use these scopes in the " +
+		"get token call.");
 	if (!query) {
 		// there was no matching saved request, this is an error
 		res.render('error', {error: 'No matching authorization request'});
@@ -193,6 +218,8 @@ app.post('/approve', function(req, res) {
 				token_response.state = query.state;
 			} 				
 			urlParsed.hash = qs.stringify(token_response);
+			console.log("Finally, we redirect the client " +
+				"to this url: %s\n\n", url.format(urlParsed));
 			res.redirect(url.format(urlParsed));
 			return;
 

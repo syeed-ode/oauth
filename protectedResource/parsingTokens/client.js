@@ -31,10 +31,10 @@ var client = {
 	"client_id": "oauth-client-1",
 	"client_secret": "oauth-client-secret-1",
 	"redirect_uris": ["http://localhost:9000/callback"],
-	"scope": ""
+	"scope": "read write delete"
 };
 
-var protectedResource = 'http://localhost:9002/resource';
+var wordApi = 'http://localhost:9002/words';
 
 var state = null;
 
@@ -122,31 +122,81 @@ app.get("/callback", function(req, res){
 	}
 });
 
-app.get('/fetch_resource', function(req, res) {
+app.get('/words', function (req, res) {
+	res.render('words', {words: '', timestamp: 0, result: 'noget'});
+	return;
+});
 
-	console.log('Making request with access token %s', access_token);
+app.get('/get_words', function (req, res) {
+
+	var headers = {
+		'Authorization': 'Bearer ' + access_token,
+		'Content-Type': 'application/x-www-form-urlencoded'
+	};
+	
+	var resource = request('GET', wordApi,
+		{headers: headers}
+	);
+	
+	if (resource.statusCode >= 200 && resource.statusCode < 300) {
+		var body = JSON.parse(resource.getBody());
+		res.render('words', {words: body.words, timestamp: body.timestamp, result: 'get'});
+		return;
+	} else {
+		res.render('words', {words: '', timestamp: 0, result: 'noget'});
+		return;
+	}
+	
+	
+	
+});
+
+app.get('/add_word', function (req, res) {
 	
 	var headers = {
 		'Authorization': 'Bearer ' + access_token,
 		'Content-Type': 'application/x-www-form-urlencoded'
 	};
 	
-	var resource = request('POST', protectedResource,
+	var form_body = qs.stringify({word: req.query.word});
+	
+	var resource = request('POST', wordApi,
+		{headers: headers, body: form_body}
+	);
+	
+	if (resource.statusCode >= 200 && resource.statusCode < 300) {
+		res.render('words', {words: '', timestamp: 0, result: 'add'});
+		return;
+	} else {
+		res.render('words', {words: '', timestamp: 0, result: 'noadd'});
+		return;
+	}
+	
+
+});
+
+app.get('/delete_word', function (req, res) {
+
+	var headers = {
+		'Authorization': 'Bearer ' + access_token,
+		'Content-Type': 'application/x-www-form-urlencoded'
+	};
+	
+	var resource = request('DELETE', wordApi,
 		{headers: headers}
 	);
 	
 	if (resource.statusCode >= 200 && resource.statusCode < 300) {
-		var body = JSON.parse(resource.getBody());
-		res.render('data', {resource: body});
+		res.render('words', {words: '', timestamp: 0, result: 'rm'});
 		return;
 	} else {
-		access_token = null;
-		res.render('error', {error: 'Server returned response code: ' + resource.statusCode});
+		res.render('words', {words: '', timestamp: 0, result: 'norm'});
 		return;
 	}
 	
 	
 });
+
 
 app.use('/', express.static('files/client'));
 
